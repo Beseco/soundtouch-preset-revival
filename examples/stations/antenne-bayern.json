@@ -1,0 +1,10 @@
+{
+  "audio": {
+    "hasPlaylist": false,
+    "isRealtime": true,
+    "streamUrl": "http://mp3channels.webradio.antenne.de/antenne"
+  },
+  "imageUrl": "",
+  "name": "Antenne Bayern",
+  "streamType": "liveRadio"
+}

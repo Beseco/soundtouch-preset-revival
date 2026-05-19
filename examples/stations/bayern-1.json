@@ -1,0 +1,10 @@
+{
+  "audio": {
+    "hasPlaylist": false,
+    "isRealtime": true,
+    "streamUrl": "http://dispatcher.rndfnk.com/br/br1obb/live/mp3/mid"
+  },
+  "imageUrl": "",
+  "name": "Bayern 1",
+  "streamType": "liveRadio"
+}

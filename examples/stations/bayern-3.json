@@ -1,0 +1,10 @@
+{
+  "audio": {
+    "hasPlaylist": false,
+    "isRealtime": true,
+    "streamUrl": "http://dispatcher.rndfnk.com/br/br3/live/mp3/mid"
+  },
+  "imageUrl": "",
+  "name": "Bayern 3",
+  "streamType": "liveRadio"
+}

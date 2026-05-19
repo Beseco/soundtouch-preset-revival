@@ -1,0 +1,11 @@
+{
+  "audio": {
+    "hasPlaylist": false,
+    "isRealtime": true,
+    "streamUrl": "https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3"
+  },
+  "imageUrl": "",
+  "name": "Deutschlandfunk",
+  "streamType": "liveRadio",
+  "_note": "HTTPS-only stream. May need an nginx reverse proxy — see examples/nginx-https-proxy.conf"
+}

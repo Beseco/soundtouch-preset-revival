@@ -1,0 +1,11 @@
+{
+  "audio": {
+    "hasPlaylist": false,
+    "isRealtime": true,
+    "streamUrl": "https://stream.otvoreni.hr/otvoreni"
+  },
+  "imageUrl": "",
+  "name": "Otvoreni Radio",
+  "streamType": "liveRadio",
+  "_note": "Croatian Top40/CHR station from Zagreb. HTTPS-only — but confirmed working on SoundTouch 20."
+}
