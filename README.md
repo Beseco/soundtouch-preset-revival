@@ -12,7 +12,7 @@ Just a tiny HTTP server in your LAN and a few `curl` commands.
 
 ## The Problem
 
-On May 6, 2026, Bose shut down the SoundTouch cloud service. What worked before stopped working:
+On May 6, 2026, Bose shut down the SoundTouch cloud service. What stopped working:
 
 - ❌ Internet radio browsing inside the SoundTouch app
 - ❌ TuneIn, Pandora, Deezer presets
@@ -43,92 +43,105 @@ When you press preset button 1, the speaker:
 
 ```
 ┌──────────────┐  press [1]  ┌───────────────┐  GET station.json  ┌────────────┐
-│ SoundTouch   │ ──────────► │ Local HTTP    │ ─────────────────► │ Your nginx │
-│ Speaker      │             │ Stream Server │ ◄───── JSON ────── │ (LXC/VM)   │
+│ SoundTouch   │ ──────────► │ Local HTTP    │ ─────────────────► │ This repo's│
+│ Speaker      │             │ Server        │ ◄───── JSON ────── │ /server    │
 └──────────────┘             └───────────────┘                    └────────────┘
-       │                                                                  
-       │ GET streamUrl from JSON                                           
-       ▼                                                                  
-┌──────────────┐                                                          
-│  Radio       │                                                          
-│  Station     │                                                          
-└──────────────┘                                                          
+       │
+       │ GET streamUrl from JSON
+       ▼
+┌──────────────┐
+│  Radio       │
+│  Station     │
+└──────────────┘
 ```
+
+The **station server is included in this repo** — a tiny Docker container or a 4-line nginx setup. Runs on anything: Raspberry Pi, NAS, LXC, your existing homelab.
 
 ---
 
 ## Prerequisites
 
-- A Bose SoundTouch 10/20/30 with firmware that pre-dates the cloud-off update (most should work — confirmed on SoundTouch 20)
-- A device on the same LAN to host a tiny HTTP server (any Linux box, LXC, NAS, Raspberry Pi works)
-- `curl` from any machine to send the configuration
-- Your SoundTouch's IP address (find it on your router or via `curl http://<guess>:8090/info`)
+- A Bose SoundTouch 10/20/30 (confirmed on SoundTouch 20)
+- A device on the same LAN that can run Docker or nginx (Pi/NAS/LXC/VM/Mac — anything)
+- `curl` from any machine
+- Your SoundTouch's IP address
 
 ---
 
 ## Quick Start
 
-### 1. Find your speaker
+### Step 1: Start the station server
 
 ```bash
-# Replace 192.168.10.36 with your speaker's IP
-curl http://192.168.10.36:8090/info
+git clone https://github.com/Beseco/soundtouch-preset-revival.git
+cd soundtouch-preset-revival/server
+docker compose up -d
 ```
 
-You should get an XML blob with device info. Note your speaker's IP.
+The server now serves the included example stations at `http://<your-host-ip>/radio/`.
 
-### 2. Check that LOCAL_INTERNET_RADIO is available
+Don't have Docker? See [`server/README.md`](server/README.md) for the bare-metal nginx alternative.
+
+### Step 2: Find your speaker's IP
+
+If you don't know it, scan your subnet:
 
 ```bash
-curl http://192.168.10.36:8090/sources | grep -o 'source="LOCAL_INTERNET_RADIO"[^/]*'
+./scripts/discover-speakers.sh 192.168.1
+```
+
+Or check your router's DHCP lease list.
+
+### Step 3: Verify `LOCAL_INTERNET_RADIO` is available on your speaker
+
+```bash
+curl http://<speaker-ip>:8090/sources | grep -o 'source="LOCAL_INTERNET_RADIO"[^/]*'
 ```
 
 Expected: `source="LOCAL_INTERNET_RADIO" status="READY"`
 
-If the status is anything else, this method won't work and you should look at [AfterTouch](https://github.com/gesellix/Bose-SoundTouch) for a heavier cloud-emulation approach.
+If you don't see this, this method won't work for your model — look at [AfterTouch](https://github.com/gesellix/Bose-SoundTouch) instead.
 
-### 3. Set up the HTTP server
-
-On any Linux box in your LAN (here: `192.168.10.175`):
+### Step 4: Write a preset
 
 ```bash
-apt install -y nginx
-mkdir -p /var/www/html/radio
-```
-
-### 4. Create a station JSON
-
-```bash
-cat > /var/www/html/radio/bayern3.json << 'EOF'
-{
-  "audio": {
-    "hasPlaylist": false,
-    "isRealtime": true,
-    "streamUrl": "http://dispatcher.rndfnk.com/br/br3/live/mp3/mid"
-  },
-  "imageUrl": "",
-  "name": "Bayern 3",
-  "streamType": "liveRadio"
-}
-EOF
-```
-
-### 5. Store the preset on the speaker
-
-```bash
-curl -X POST http://192.168.10.36:8090/storePreset \
+curl -X POST http://<speaker-ip>:8090/storePreset \
   -H "Content-Type: application/xml" \
   -d '<preset id="1">
   <ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl"
-               location="http://192.168.10.175/radio/bayern3.json">
+               location="http://<your-server-ip>/radio/bayern-3.json">
     <itemName>Bayern 3</itemName>
   </ContentItem>
 </preset>'
 ```
 
-### 6. Press button 1 on your speaker
+Or bulk-write all 6 presets at once: edit `scripts/set-presets.sh` and run it.
+
+### Step 5: Press button 1 on your speaker
 
 🎉 Music plays.
+
+---
+
+## Repository Structure
+
+```
+soundtouch-preset-revival/
+├── server/                    ← The HTTP server bundle (start here!)
+│   ├── docker-compose.yml         One-command Docker setup
+│   ├── nginx/default.conf         nginx config with stream proxies
+│   └── stations/                  Ready-to-use station JSONs
+├── scripts/                   ← Helper scripts
+│   ├── discover-speakers.sh       Scan LAN for SoundTouch devices
+│   ├── set-presets.sh             Write all 6 presets at once
+│   └── verify-presets.sh          Show current presets readably
+├── examples/                  ← Additional station JSONs + nginx examples
+│   ├── stations/                  Library of working station configs
+│   └── lxc-setup/                 Proxmox LXC step-by-step
+└── docs/
+    ├── API-REFERENCE.md           SoundTouch HTTP API quick-ref
+    └── TROUBLESHOOTING.md         Troubleshooting and diagnostics
+```
 
 ---
 
@@ -136,31 +149,23 @@ curl -X POST http://192.168.10.36:8090/storePreset \
 
 ### HTTP vs HTTPS streams
 
-The `LOCAL_INTERNET_RADIO` source works most reliably with **plain HTTP streams**. Many radio stations only offer HTTPS — if a stream doesn't play, add an nginx reverse-proxy in front of it. See [`examples/nginx-https-proxy.conf`](examples/nginx-https-proxy.conf).
+The `LOCAL_INTERNET_RADIO` source works most reliably with **plain HTTP streams**. The included server has a reverse-proxy that converts HTTPS streams to HTTP — see `server/nginx/default.conf` for the pattern.
 
 ### Preset slots
 
-Each speaker has 6 preset slots (`id="1"` through `id="6"`). Existing presets get overwritten without warning. To see your current presets:
+Each speaker has 6 preset slots (`id="1"` through `id="6"`). Existing presets get overwritten without warning. See current state:
 
 ```bash
-curl http://192.168.10.36:8090/presets
+curl http://<speaker-ip>:8090/presets
 ```
 
 ### The HTTP server must stay online
 
-If your nginx/LXC is down, the preset button does nothing — the speaker can't fetch the JSON. Set the LXC and nginx to auto-start.
+If the server is down, the preset button does nothing — the speaker can't fetch the JSON. The Docker compose file uses `restart: unless-stopped` to handle this.
 
 ### No firmware updates after May 6, 2026
 
 This is actually good news: the SoundTouch firmware is frozen. The behavior described here won't be killed by a future update.
-
----
-
-## Examples
-
-Ready-to-use JSON descriptors for common stations are in [`examples/stations/`](examples/stations/).
-
-Helper scripts to bulk-configure all 6 presets in [`scripts/`](scripts/).
 
 ---
 
@@ -169,11 +174,12 @@ Helper scripts to bulk-configure all 6 presets in [`scripts/`](scripts/).
 | Approach | Difficulty | Replaces App? | Risk |
 |---|---|---|---|
 | **This repo** (LOCAL_INTERNET_RADIO) | ⭐ Easy | No — preset buttons only | None |
-| Music Assistant + AirPlay/DLNA | ⭐⭐ Medium | Yes — but no physical buttons | Low |
+| [Music Assistant](https://music-assistant.io/) + AirPlay/DLNA | ⭐⭐ Medium | Yes — but no physical buttons | Low |
+| [sandervg/homeassistant-bose-soundtouch-bridge](https://github.com/sandervg/homeassistant-bose-soundtouch-bridge) | ⭐⭐ Medium | Partial — needs HA + Mosquitto | Low |
 | [AfterTouch](https://github.com/gesellix/Bose-SoundTouch) | ⭐⭐⭐⭐ Advanced | Yes — full cloud emulation | DNS hijack + CA cert |
 | [SoundTouch-Hybrid-2026](https://github.com/TJGigs/Bose-SoundTouch-Hybrid-2026) | ⭐⭐⭐⭐ Advanced | Yes — full feature parity | OverrideSdkPrivateCfg.xml injection |
 
-This project is intentionally the **simplest possible solution**. If you want the full app experience back, look at AfterTouch.
+This project is intentionally the **simplest possible solution**.
 
 ---
 
@@ -185,7 +191,7 @@ See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
 
 ## Contributing
 
-Found a station that doesn't play? Got a working stream URL for a regional station? Open a PR adding a JSON to `examples/stations/`.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Station JSON contributions especially welcome!
 
 ---
 
@@ -193,8 +199,10 @@ Found a station that doesn't play? Got a working stream URL for a regional stati
 
 - [gesellix/Bose-SoundTouch](https://github.com/gesellix/Bose-SoundTouch) — AfterTouch, the full cloud-emulation toolkit
 - [thlucas1/homeassistantcomponent_soundtouchplus](https://github.com/thlucas1/homeassistantcomponent_soundtouchplus) — Home Assistant integration
+- [sandervg/homeassistant-bose-soundtouch-bridge](https://github.com/sandervg/homeassistant-bose-soundtouch-bridge) — HA add-on, WebSocket→UPnP bridge
 - [TJGigs/Bose-SoundTouch-Hybrid-2026](https://github.com/TJGigs/Bose-SoundTouch-Hybrid-2026) — Private Cloud emulation
 - The Bose community on Reddit, ifun.de, borncity.com, and Stereo-Guide for documenting workarounds in the weeks after the shutdown
+- Discovered through the [SoundTouch Plus Wiki](https://github.com/thlucas1/bosesoundtouchapi) and a [gist by rody64](https://gist.github.com/rody64/98a59990ff60ea962cac72cbe93edf56) — credit to user `gmuth` for the HTTP-JSON simplification
 
 ## Disclaimer
 

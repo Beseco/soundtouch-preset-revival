@@ -1,0 +1,19 @@
+services:
+  station-server:
+    image: nginx:alpine
+    container_name: soundtouch-station-server
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./stations:/var/www/html/radio:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/radio/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+# Network: host mode so the server is reachable at the host's LAN IP directly.
+# If you prefer port mapping instead, remove `network_mode: host` and add:
+#   ports:
+#     - "80:80"
